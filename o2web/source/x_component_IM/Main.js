@@ -12,13 +12,15 @@ MWF.xApplication.IM.Main = new Class({
 		"title": MWF.xApplication.IM.LP.title
 	},
 	onQueryLoad: function(){
+	    this.chats = [];
 		this.lp = MWF.xApplication.IM.LP;
         this.left = null;
         this.top = null;
         this.height = null;
         this.userAction = MWF.Actions.get("x_organization_assemble_control");
-        this.socketAction = MWF.Actions.get("x_collaboration_assemble_websocket");
-        //if (!this.userAction) this.userAction = new MWF.xApplication.IM.Actions.RestActions();
+        // this.socketAction = MWF.Actions.get("x_collaboration_assemble_websocket");
+        // if (!this.userAction) this.userAction = new MWF.xApplication.IM.Actions.RestActions();
+        if(!this.socketAction) this.socketAction = new MWF.xApplication.IM.Actions.RestActions();
 	},
     loadWindow: function(isCurrent){
         this.fireAppEvent("queryLoadWindow");
@@ -425,22 +427,51 @@ MWF.xApplication.IM.ChatList = new Class({
         this.offlineTree = new MWF.widget.Tree(this.app.userListChatAreaOfflineNode, {"style": "chat"});
         this.offlineTree.load();
 
-        this.socketAction.listChat(function(json){
-            json.data.each(function(data){
-                var pName = (data.from===this.app.owner.distinguishedName) ? data.person : data.from;
-                if (pName!==this.app.owner.distinguishedName){
-                    this.userAction.getPerson(pName, function(pjson){
-                        this.socketAction.personOnline(pjson.data.distinguishedName, function(ojson){
-                            if (ojson.data.onlineStatus === "online"){
-                                this.appendIdentityTreeNode(pjson.data, this.onlineTree);
-                            }else{
-                                this.appendIdentityTreeNode(pjson.data, this.offlineTree);
-                            }
+        // this.socketAction.listChat(function(json){
+        //     json.data.each(function(data){
+        //         var pName = (data.from===this.app.owner.distinguishedName) ? data.person : data.from;
+        //         if (pName!==this.app.owner.distinguishedName){
+        //             this.userAction.getPerson(pName, function(pjson){
+        //                 this.socketAction.personOnline(pjson.data.distinguishedName, function(ojson){
+        //                     if (ojson.data.onlineStatus === "online"){
+        //                         this.appendIdentityTreeNode(pjson.data, this.onlineTree);
+        //                     }else{
+        //                         this.appendIdentityTreeNode(pjson.data, this.offlineTree);
+        //                     }
+        //                 }.bind(this));
+        //             }.bind(this));
+        //         }
+        //     }.bind(this));
+        // }.bind(this));
+        new Request({
+            url:'http://122.224.253.202:20020/x_message_assemble_communicate/jaxrs/im/conversation/list/my',
+            method:'GET',
+            dataType:'json',
+            headers : {'Content-Type':'application/json;charset=utf8'},
+            withCredentials: true,
+            onRequest: function(){ },
+            onSuccess: function(responseText){
+                var json = JSON.parse(responseText);
+                json.data.each(function(data){
+                    var pName=null;
+                    data.personList.forEach(person=>{
+                        if(person!==this.app.owner.distinguishedName) pName = person;
+                    });
+                    if (pName!==null){
+                        this.userAction.getPerson(pName, function(pjson){
+                            this.socketAction.personOnline(pjson.data.distinguishedName, function(ojson){
+                                if (ojson.data.onlineStatus === "online"){
+                                    this.appendIdentityTreeNode(pjson.data, this.onlineTree);
+                                }else{
+                                    this.appendIdentityTreeNode(pjson.data, this.offlineTree);
+                                }
+                            }.bind(this));
                         }.bind(this));
-                    }.bind(this));
-                }
-            }.bind(this));
-        }.bind(this));
+                    }
+                }.bind(this));
+            }.bind(this),
+            onFailure: function(){}
+        }).send();
     }
 });
 MWF.xApplication.IM.SearchList = new Class({
@@ -534,7 +565,7 @@ MWF.xApplication.IM.Person = new Class({
             var html = "<table width=\"100%\" cellpadding=\"3px\" border=\"0\">";
             html += "<tr><td>"+MWF.LP.desktop.person.personEmployee+"</td><td>"+this.data.employee+"</td></tr>";
             html += "<tr><td>"+MWF.LP.desktop.person.personMobile+"</td><td>"+this.data.mobile+"</td></tr>";
-            html += "<tr><td>"+MWF.LP.desktop.person.personMail+"</td><td>"+this.data.mail+"</td></tr>"
+            html += "<tr><td>"+MWF.LP.desktop.person.personMail+"</td><td>"+this.data.mail+"</td></tr>";
             html += "<tr><td>"+MWF.LP.desktop.person.personQQ+"</td><td>"+this.data.qq+"</td></tr>";
             html += "<tr><td>"+MWF.LP.desktop.person.personWeixin+"</td><td>"+this.data.weixin+"</td></tr>";
             if (dutys.length) html += "<tr><td>"+MWF.LP.desktop.person.duty+"</td><td>"+dutys.join(", ")+"</td></tr>";
@@ -571,7 +602,7 @@ MWF.xApplication.IM.Person = new Class({
         this.personInforNode.setStyle("display", "none");
     },
     checkUnread: function(){
-        if (layout.desktop.widgets["IMIMWidget"]){
+        if (layout.desktop.widgets && layout.desktop.widgets["IMIMWidget"]){
             var unShowMessage = layout.desktop.widgets["IMIMWidget"].unShowMessage;
             var key = this.data.distinguishedName+this.app.owner.distinguishedName;
             if (unShowMessage[key]){
@@ -602,6 +633,7 @@ MWF.xApplication.IM.Person = new Class({
     },
     openChat: function(e){
         if (this.data.distinguishedName!==this.app.owner.distinguishedName){
+
             var chat = layout.desktop.apps["Chat"];
             if (chat){
                 var key = this.data.distinguishedName+layout.desktop.session.user.distinguishedName;
@@ -612,7 +644,11 @@ MWF.xApplication.IM.Person = new Class({
             var _self = this;
             layout.desktop.openApplication(e, "Chat", {
                 "onPostLoad": function(){
-                    dialogue = this.addDialogue(_self.app.owner, [_self.data]);
+                    console.log(layout.desktop.apps["IM"]);
+                    layout.desktop.apps["IM"].chats.push(this);
+                    var dialogue = this.addDialogue(_self.app.owner, [_self.data]);
+                    console.log("Dialogue");
+                    console.log(_self.data);
                 }
             });
         }

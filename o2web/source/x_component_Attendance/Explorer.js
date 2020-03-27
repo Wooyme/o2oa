@@ -608,10 +608,11 @@ MWF.xApplication.Attendance.Explorer.PopupForm = new Class({
             }
         }).inject(this.app.content, "after");
 
+        var cssFormAreaNode = this.css.formAreaNode;
+        cssFormAreaNode["z-index"] = 1;
         this.formAreaNode = new Element("div", {
-            "styles": this.css.formAreaNode
+            "styles": cssFormAreaNode
         });
-
         this.createFormNode();
 
         this.formAreaNode.inject(this.formMaskNode, "after");

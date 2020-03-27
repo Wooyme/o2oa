@@ -1,5 +1,7 @@
 MWF.xApplication.Attendance = MWF.xApplication.Attendance || {};
-
+MWF.xDesktop.requireApp("Template", "Explorer", null, false);
+MWF.xDesktop.requireApp("Attendance", "Explorer", null, false);
+MWF.xDesktop.requireApp("Selector", "package", null, false);
 MWF.xDesktop.requireApp("Attendance", "lp."+MWF.language, null, false);
 
 //MWF.xApplication.Attendance.Org = new Class({
@@ -23,7 +25,7 @@ MWF.xApplication.Attendance.Calendar = new Class({
     options : {
         date : null
     },
-    initialize: function (node, explorer, data, options) {
+    initialize: function (node, explorer, data, options,dayClick) {
         this.setOptions(options);
         this.app = explorer.app;
         this.explorer = explorer;
@@ -35,6 +37,7 @@ MWF.xApplication.Attendance.Calendar = new Class({
         this.eventData = data.eventData;
         this.detail = data.detail;
         this.statusColor = explorer.statusColor;
+        this.dayClick = dayClick;
     },
     reload: function () {
         this.node.empty();
@@ -65,6 +68,7 @@ MWF.xApplication.Attendance.Calendar = new Class({
     },
     loadCalendar : function(){
         var _self = this;
+        if(!this.dayClick) this.dayClick = function(){};
         jQuery(this.node).fullCalendar({
             header: {
                 left: '', //'prev,next today',
@@ -84,6 +88,7 @@ MWF.xApplication.Attendance.Calendar = new Class({
                     return "<span style='float:right;padding-right:5px;'>班</span>"
                 }
             }.bind(this),
+            dayClick:this.dayClick,
             eventMouseover : function(event, jsEvent, view){
                 jsEvent.target.title = event.text;
             },
@@ -91,6 +96,7 @@ MWF.xApplication.Attendance.Calendar = new Class({
         });
     }
 });
+
 
 MWF.xApplication.Attendance.Echarts = new Class({
     Implements: [Options, Events],

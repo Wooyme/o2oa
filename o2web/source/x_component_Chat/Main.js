@@ -2,39 +2,39 @@ MWF.xApplication.Chat.options.multitask = false;
 MWF.xApplication.Chat.options.executable = false;
 MWF.xDesktop.requireApp("IM", "Actions.RestActions", null, false);
 MWF.xApplication.Chat.Main = new Class({
-	Extends: MWF.xApplication.Common.Main,
-	Implements: [Options, Events],
+    Extends: MWF.xApplication.Common.Main,
+    Implements: [Options, Events],
 
-	options: {
-		"style": "default",
-		"name": "Chat",
-		"icon": "icon.png",
-		"width": "800",
-		"height": "500",
-		"title": MWF.xApplication.Chat.LP.title,
+    options: {
+        "style": "default",
+        "name": "Chat",
+        "icon": "icon.png",
+        "width": "800",
+        "height": "500",
+        "title": MWF.xApplication.Chat.LP.title,
         "id": "",
         "owner": "",
         "desktopReload": false
-	},
-	onQueryLoad: function(){
-		this.lp = MWF.xApplication.Chat.LP;
+    },
+    onQueryLoad: function () {
+        this.lp = MWF.xApplication.Chat.LP;
         this.userAction = MWF.Actions.get("x_organization_assemble_control");
         this.socketAction = MWF.Actions.get("x_collaboration_assemble_websocket");
+        this.wsAction = MWF.Actions.get("x_message_assemble_communicate");
         //if (!this.userAction) this.userAction = new MWF.xApplication.IM.Actions.RestActions();
-	},
-	loadApplication: function(callback){
+    },
+    loadApplication: function (callback) {
         this.dialogues = {};
 
         this.node = new Element("div", {"styles": this.css.content}).inject(this.content);
         this.dialogueTabAreaNode = new Element("div", {"styles": this.css.dialogueTabAreaNode}).inject(this.node);
         this.chatContentAreaNode = new Element("div", {"styles": this.css.chatContentAreaNode}).inject(this.node);
-
-        this.chatTitleNode =  new Element("div", {"styles": this.css.chatTitleNode}).inject(this.chatContentAreaNode);
-        this.chatTitleAddMemberAction =  new Element("div", {"styles": this.css.chatTitleAddMemberAction}).inject(this.chatTitleNode);
+        this.chatTitleNode = new Element("div", {"styles": this.css.chatTitleNode}).inject(this.chatContentAreaNode);
+        this.chatTitleAddMemberAction = new Element("div", {"styles": this.css.chatTitleAddMemberAction}).inject(this.chatTitleNode);
         //this.chatTitleAddMemberActionButton =  new Element("div", {"styles": this.css.chatTitleAddMemberActionButton, "text": this.lp.add}).inject(this.chatTitleAddMemberAction);
         //this.chatTitleDelMemberActionButton =  new Element("div", {"styles": this.css.chatTitleAddMemberActionButton, "text": this.lp.del}).inject(this.chatTitleAddMemberAction);
 
-        this.chatTitleMemberNode =  new Element("div", {"styles": this.css.chatTitleMemberNode}).inject(this.chatTitleNode);
+        this.chatTitleMemberNode = new Element("div", {"styles": this.css.chatTitleMemberNode}).inject(this.chatTitleNode);
 
         this.chatAreaNode = new Element("div", {"styles": this.css.chatAreaNode}).inject(this.chatContentAreaNode);
 
@@ -43,16 +43,18 @@ MWF.xApplication.Chat.Main = new Class({
         this.chatTextAreaNode = new Element("textarea", {"styles": this.css.chatTextAreaNode}).inject(this.chatInputNode);
 
         this.chatInputActionNode = new Element("div", {"styles": this.css.chatInputActionNode}).inject(this.chatInputAreaNode);
-        this.chatSendActionNode = new Element("div", {"styles": this.css.chatSendActionNode, "text": this.lp.send}).inject(this.chatInputActionNode);
-
+        this.chatSendActionNode = new Element("div", {
+            "styles": this.css.chatSendActionNode,
+            "text": this.lp.send
+        }).inject(this.chatInputActionNode);
         this.setChatAreaHeight();
         this.addEvent("resize", this.setChatAreaHeight);
 
         this.setEvent();
     },
-    setEvent: function(){
-        this.chatTextAreaNode.addEvent("keydown", function(e){
-            if (e.control && (e.code==13)){
+    setEvent: function () {
+        this.chatTextAreaNode.addEvent("keydown", function (e) {
+            if (e.control && (e.code == 13)) {
                 this.sendMessage();
                 this.chatTextAreaNode.focus();
             }
@@ -118,51 +120,62 @@ MWF.xApplication.Chat.Main = new Class({
     //        }
     //    }
     //},
-    sendMessage: function(){
-        if (this.current){
+    sendMessage: function () {
+        if (this.current) {
             var text = this.chatTextAreaNode.get("value");
-            if (text){
-                //message = {
-                //    "messageType": "chat",
-                //    "personList": this.current.toNames,
-                //    "text": text
-                //}
+            if (text) {
                 message = {
-                    "text": text,
-                    "type": "text",
-                    "from": this.current.owner.distinguishedName,
-                    "person": this.current.toNames[0],
-                    "category": "dialog"
+                    "messageType": "chat",
+                    "personList": this.current.toNames,
+                    "text": text
                 };
-                this.desktop.socket.send(message);
                 this.current.showMessage(message);
+                var data = {
+                    "conversationId": this.current.chatId,
+                    "body": text,
+                    "createPerson": this.current.owner.distinguishedName
+                };
+                new Request({
+                    url: 'http://122.224.253.202:20020/x_message_assemble_communicate/jaxrs/im/msg',
+                    method: 'POST',
+                    dataType: 'json',
+                    headers: {'Content-Type': 'application/json;charset=utf8'},
+                    data: JSON.stringify(data),
+                    withCredentials: true,
+                    onRequest: function () {
+                    },
+                    onSuccess: function (responseText) {
+                    },
+                    onFailure: function () {
+                    }
+                }).send();
             }
             this.chatTextAreaNode.set("value", "");
             //this.addToCathList();
         }
     },
 
-    setChatAreaHeight: function(){
+    setChatAreaHeight: function () {
         var size = this.chatContentAreaNode.getSize();
         var titleSize = this.chatTitleNode.getSize();
         var inputSize = this.chatInputAreaNode.getSize();
         var y = size.y - titleSize.y - inputSize.y;
 
-        this.chatAreaNode.setStyle("height", ""+y+"px");
+        this.chatAreaNode.setStyle("height", "" + y + "px");
     },
 
-    addDialogueBack: function(owner, members){
+    addDialogueBack: function (owner, members) {
         var dialogue = new MWF.xApplication.Chat.Dialogue(owner, members, this);
-        var key1 = owner.distinguishedName+members[0].distinguishedName;
-        var key2 = members[0].distinguishedName+owner.distinguishedName;
+        var key1 = owner.distinguishedName + members[0].distinguishedName;
+        var key2 = members[0].distinguishedName + owner.distinguishedName;
         this.dialogues[key1] = dialogue;
         this.dialogues[key2] = dialogue;
         return dialogue;
     },
-    addDialogue: function(owner, members){
+    addDialogue: function (owner, members) {
         var dialogue = new MWF.xApplication.Chat.Dialogue(owner, members, this);
-        var key1 = owner.distinguishedName+members[0].distinguishedName;
-        var key2 = members[0].distinguishedName+owner.distinguishedName;
+        var key1 = owner.distinguishedName + members[0].distinguishedName;
+        var key2 = members[0].distinguishedName + owner.distinguishedName;
         this.dialogues[key1] = dialogue;
         this.dialogues[key2] = dialogue;
         dialogue.setCurrent();
@@ -172,37 +185,131 @@ MWF.xApplication.Chat.Main = new Class({
 });
 
 MWF.xApplication.Chat.Dialogue = new Class({
-    initialize: function(owner, members, chat){
+    initialize: function (owner, members, chat) {
         this.chat = chat;
         this.owner = owner;
         this.members = members;
         this.css = this.chat.css;
         this.unreadCount = 0;
         this.messageDate = null;
+        this.chatId = null;
+        this.history = [];
         this.load();
     },
-    load: function(){
+    load: function () {
         this.createTab();
         this.createContent();
-
+        new Request({
+            url: 'http://122.224.253.202:20020/x_message_assemble_communicate/jaxrs/im/conversation/list/my',
+            method: 'GET',
+            dataType: 'json',
+            headers: {'Content-Type': 'application/json;charset=utf8'},
+            withCredentials: true,
+            onRequest: function () {
+            },
+            onSuccess: function (responseText) {
+                var json = JSON.parse(responseText);
+                var data;
+                console.log(json);
+                for (var i = 0; i < json.data.length; i++) {
+                    data = json.data[i];
+                    console.log(data);
+                    if (data.personList.includes(this.members[0].distinguishedName)) {
+                        this.chatId = data.id;
+                        break;
+                    }
+                }
+                if (this.chatId == null) {
+                    data = {
+                        "type": "single",
+                        "title": this.members[0].name,
+                        "personList": [this.members[0].distinguishedName]
+                    };
+                    new Request({
+                        url: 'http://122.224.253.202:20020/x_message_assemble_communicate/jaxrs/im/conversation',
+                        method: 'POST',
+                        dataType: 'json',
+                        headers: {'Content-Type': 'application/json;charset=utf8'},
+                        data: JSON.stringify(data),
+                        withCredentials: true,
+                        onRequest: function () {
+                        },
+                        onSuccess: function (responseText) {
+                            var json = JSON.parse(responseText);
+                            this.chatId = json.data.id;
+                            this.loadHistory();
+                        }.bind(this),
+                        onFailure: function () {
+                        }
+                    }).send();
+                } else {
+                    this.loadHistory();
+                }
+            }.bind(this),
+            onFailure: function () {
+            }
+        }).send();
     },
-    createContent: function(){
+    loadHistory: function () {
+        if (this.chatId == null) return;
+        if (this.page == null) this.page = 1;
+        var data = {};
+        data["conversationId"] = this.chatId;
+        new Request({
+            url: 'http://122.224.253.202:20020/x_message_assemble_communicate/jaxrs/im/msg/list/' + this.page + '/size/5',
+            method: 'POST',
+            dataType: 'json',
+            headers: {'Content-Type': 'application/json;charset=utf8'},
+            withCredentials: true,
+            data: JSON.stringify(data),
+            onRequest: function () {
+            },
+            onSuccess: function (responseText) {
+                var json = JSON.parse(responseText);
+                json.data.reverse().forEach(data => {
+                    if (data.createPerson !== this.owner.distinguishedName)
+                        this.showMessage({text: data.body}, data.createPerson, data.createTime);
+                    else
+                        this.showMessage({text: data.body}, null, data.createTime);
+                });
+                this.pointer = null;
+            }.bind(this),
+            onFailure: function () {
+            }
+        }).send();
+    },
+    createContent: function () {
+        this.loadMoreNode = new Element("a", {
+            "text": "更早的消息",
+            "styles": this.css.messageTimeNode,
+            "href": "javascript:void(0)"
+        }).inject(this.chat.chatAreaNode);
         this.chatContentScrollNode = new Element("div", {"styles": this.css.chatContentScrollNode}).inject(this.chat.chatAreaNode);
         this.chatContentNode = new Element("div", {"styles": this.css.chatContentNode}).inject(this.chatContentScrollNode);
-
+        this.loadMoreNode.addEvents({
+            "click": function () {
+                this.page++;
+                this.loadHistory();
+            }.bind(this)
+        });
         this.scroll = new Fx.Scroll(this.chatContentScrollNode);
-        MWF.require("MWF.widget.ScrollBar", function(){
+        MWF.require("MWF.widget.ScrollBar", function () {
             new MWF.widget.ScrollBar(this.chatContentScrollNode, {
-                "style":"xDesktop_Message", "where": "before", "indent": false, "distance": 50, "friction": 6,	"axis": {"x": false, "y": true}
+                "style": "xDesktop_Message",
+                "where": "before",
+                "indent": false,
+                "distance": 50,
+                "friction": 6,
+                "axis": {"x": false, "y": true}
             });
         }.bind(this));
     },
-    createTab: function(){
+    createTab: function () {
         this.tabNode = new Element("div", {"styles": this.css.chatTabNode}).inject(this.chat.dialogueTabAreaNode);
         var icon = this.members[0].icon;
-        if (this.members.length>1){
-            icon = this.chat.path+this.chat.options.style+"/group.png";
-        }else{
+        if (this.members.length > 1) {
+            icon = this.chat.path + this.chat.options.style + "/group.png";
+        } else {
             icon = this.chat.userAction.getPersonIcon(this.members[0].id);
             // if (!icon){
             //     if (this.members[0].genderType=="f"){
@@ -227,7 +334,7 @@ MWF.xApplication.Chat.Dialogue = new Class({
         this.tabTextNode = new Element("div", {"styles": this.css.tabTextNode}).inject(this.tabNode);
         var names = [];
         var texts = [];
-        this.members.each(function(m){
+        this.members.each(function (m) {
             names.push(m.distinguishedName);
             texts.push(m.name)
         });
@@ -236,15 +343,17 @@ MWF.xApplication.Chat.Dialogue = new Class({
         this.tabTextNode.set("text", this.title);
 
         this.tabNode.addEvents({
-            "mouseover": function(){
+            "mouseover": function () {
                 if (this.chat.current != this) this.tabNode.setStyles(this.css.chatTabNode_over);
                 this.tabCloseAction.setStyle("display", "block");
             }.bind(this),
-            "mouseout": function(){
+            "mouseout": function () {
                 if (this.chat.current != this) this.tabNode.setStyles(this.css.chatTabNode);
                 this.tabCloseAction.setStyle("display", "none");
             }.bind(this),
-            "click": function(){this.setCurrent();}.bind(this)
+            "click": function () {
+                this.setCurrent();
+            }.bind(this)
         });
         this.tabCloseAction.addEvents({
             //"mouseover": function(){
@@ -253,16 +362,16 @@ MWF.xApplication.Chat.Dialogue = new Class({
             //"mouseout": function(){
             //    this.tabCloseAction.setStyles(this.css.tabCloseAction);
             //}.bind(this),
-            "click": function(e){
+            "click": function (e) {
                 this.close();
                 e.stopPropagation();
             }.bind(this)
         });
     },
-    close: function(){
+    close: function () {
 
     },
-    setCurrent: function(){
+    setCurrent: function () {
         if (this.chat.current) this.chat.current.setUncurrent();
         this.tabNode.setStyles(this.css.chatTabNode_current);
         this.chatContentScrollNode.setStyle("display", "block");
@@ -281,19 +390,18 @@ MWF.xApplication.Chat.Dialogue = new Class({
         //    }
         //}
 
-
         this.chat.current = this;
         this.checkUnread();
 
         this.clearUnread();
     },
-    checkUnread: function(){
-        if (layout.desktop.widgets["IMIMWidget"]){
+    checkUnread: function () {
+        if (layout.desktop.widgets && layout.desktop.widgets["IMIMWidget"]) {
             var unShowMessage = layout.desktop.widgets["IMIMWidget"].unShowMessage;
-            var key = this.members[0].distinguishedName+this.owner.distinguishedName;
-            if (unShowMessage[key]){
-                if (unShowMessage[key].length){
-                    unShowMessage[key].each(function(msg){
+            var key = this.members[0].distinguishedName + this.owner.distinguishedName;
+            if (unShowMessage[key]) {
+                if (unShowMessage[key].length) {
+                    unShowMessage[key].each(function (msg) {
                         this.showMessage(msg, msg.from);
                     }.bind(this));
                 }
@@ -304,36 +412,64 @@ MWF.xApplication.Chat.Dialogue = new Class({
         }
     },
 
-    setUncurrent: function(){
+    setUncurrent: function () {
         this.chatContentScrollNode.setStyle("display", "none");
         this.tabNode.setStyles(this.css.chatTabNode);
         this.chat.current = null;
     },
-    showMessage: function(msg, from){
+    showMessage: function (msg, from, date) {
         var messageDate = new Date();
-        if (!this.messageDate || ((messageDate.getTime()-this.messageDate.getTime()) > 120000)){
-            var timeText = messageDate.format("%Y-%m-%d %H:%M");
-            var timeNode = new Element("div", {"styles": this.css.messageTimeNode, "text": timeText}).inject(this.chatContentNode);
+        if (date)
+            messageDate = new Date(date);
+        if (!this.messageDate || (messageDate.getTime() - this.messageDate.getTime() > 120000)) {
+            if (!this.pointer) {
+                var timeText = messageDate.format("%Y-%m-%d %H:%M");
+                new Element("div", {
+                    "styles": this.css.messageTimeNode,
+                    "text": timeText
+                }).inject(this.chatContentNode);
+            } else {
+                var timeText = messageDate.format("%Y-%m-%d %H:%M");
+                this.pointer = new Element("div", {
+                    "styles": this.css.messageTimeNode,
+                    "text": timeText
+                }).inject(this.pointer, 'after');
+
+            }
             this.messageDate = messageDate;
         }
-
-        var messageNode = new Element("div", {"styles": this.css.messageNode}).inject(this.chatContentNode);
-
+        var messageNode = null;
+        if (messageDate.getTime() < this.messageDate.getTime()) {
+            messageNode = new Element("div", {"styles": this.css.messageNode}).inject(this.chatContentNode, 'top');
+            var timeText = messageDate.format("%Y-%m-%d %H:%M");
+            new Element("div", {
+                "styles": this.css.messageTimeNode,
+                "text": timeText
+            }).inject(this.chatContentNode, 'top');
+            this.messageDate = messageDate;
+            this.pointer = messageNode;
+        } else {
+            if (this.pointer) {
+                messageNode = new Element("div", {"styles": this.css.messageNode}).inject(this.pointer, 'after');
+                this.pointer = messageNode;
+            } else
+                messageNode = new Element("div", {"styles": this.css.messageNode}).inject(this.chatContentNode);
+        }
         var icon = "";
         var iconcss = "";
         var textcss = "";
-
-        if (from){
-            for (var i=0; i<this.members.length; i++){
-                if (this.members[i].distinguishedName===from) break;
+        console.log(from);
+        if (from) {
+            for (var i = 0; i < this.members.length; i++) {
+                if (this.members[i].distinguishedName === from) break;
             }
-            if (this.members[i]){
+            if (this.members[i]) {
                 icon = this.getIcon(this.members[i]);
                 iconCss = this.css.messageIconGetNode;
                 textAreaCss = this.css.messageTextAreaGetNode;
                 textCss = this.css.messageTextGetNode;
             }
-        }else{
+        } else {
             icon = this.getIcon(this.owner);
             iconCss = this.css.messageIconSendNode;
             textAreaCss = this.css.messageTextAreaSendNode;
@@ -350,7 +486,7 @@ MWF.xApplication.Chat.Dialogue = new Class({
         this.scroll.toElement(messageNode);
         //this.chatContentNode
     },
-    getIcon: function(data){
+    getIcon: function (data) {
         return this.chat.userAction.getPersonIcon(data.id);
 
         // var icon = "";
@@ -365,14 +501,17 @@ MWF.xApplication.Chat.Dialogue = new Class({
         // }
         // return icon;
     },
-    addUnreadMessage: function(data){
-        if (!this.unreadNode) this.unreadNode = new Element("div", {"styles": this.css.userListUnreadNode, "text": "0"}).inject(this.tabNode, "bottom");
-        var i = this.unreadNode.get("text").toInt()+1;
+    addUnreadMessage: function (data) {
+        if (!this.unreadNode) this.unreadNode = new Element("div", {
+            "styles": this.css.userListUnreadNode,
+            "text": "0"
+        }).inject(this.tabNode, "bottom");
+        var i = this.unreadNode.get("text").toInt() + 1;
         this.unreadNode.set("text", i);
         //this.node.inject(this.container, "top");
     },
-    clearUnread: function(){
-        if (this.unreadNode){
+    clearUnread: function () {
+        if (this.unreadNode) {
             this.unreadNode.destroy();
             this.unreadNode = null;
         }

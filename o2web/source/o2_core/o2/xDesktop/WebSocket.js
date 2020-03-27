@@ -6,8 +6,7 @@ MWF.xDesktop.WebSocket = new Class({
     Implements: [Options, Events],
     options: {},
     initialize: function(options){
-        debugger;
-        var addressObj = layout.desktop.serviceAddressList["x_message_assemble_communicate"];
+        var addressObj = layout.serviceAddressList["x_message_assemble_communicate"];
         var uri = new URI(window.location.href);
         var scheme = uri.get("scheme");
         var wsScheme = (scheme.toString().toLowerCase()==="https") ? "wss" : "ws";
@@ -41,31 +40,32 @@ MWF.xDesktop.WebSocket = new Class({
 
             try{
                 this.webSocket = new WebSocket(this.ws);
+
+                //this.webSocket = new WebSocket(this.ws);
+                this.webSocket.onopen = function (e){this.onOpen(e);}.bind(this);
+                this.webSocket.onclose = function (e){this.onClose(e);}.bind(this);
+                this.webSocket.onmessage = function (e){this.onMessage(e);}.bind(this);
+                this.webSocket.onerror = function (e){this.onError(e);}.bind(this);
+                //---------------------------------*/\
             }catch(e){
                 //WebSocket.close();
                 //this.webSocket = new WebSocket(this.ws);
+                console.log("Unable to connect to the websocket server, will retry in "+(this.heartTimeout/1000)+" seconds");
                 if (this.webSocket){
                     this.close();
                     //this.webSocket = new WebSocket(this.ws);
                 }
             }
-            //this.webSocket = new WebSocket(this.ws);
-            this.webSocket.onopen = function (e){this.onOpen(e);}.bind(this);
-            this.webSocket.onclose = function (e){this.onClose(e);}.bind(this);
-            this.webSocket.onmessage = function (e){this.onMessage(e);}.bind(this);
-            this.webSocket.onerror = function (e){this.onError(e);}.bind(this);
-            //---------------------------------*/\
             this.heartbeat();
         }
 
     },
     onOpen: function(e){
-        console.log("websocket is open ...");
+        console.log("websocket is open, You can receive system messages");
         //MWF.xDesktop.notice("success", {"x": "right", "y": "top"}, "websocket is open ...");
     },
     onClose: function(e){
-        debugger;
-        console.log("websocket is closed ...");
+        console.log("websocket is closed. ");
         if (this.reConnect) this.initialize();
         //MWF.xDesktop.notice("success", {"x": "right", "y": "top"}, "websocket is closed ...");
     },
@@ -77,6 +77,7 @@ MWF.xDesktop.WebSocket = new Class({
                     //console.log("get heartbeat...");
                     return true;
                 }
+                console.log(e.data);
                 var data = JSON.decode(e.data);
                 switch (data.category){
                     case "dialog":
@@ -88,6 +89,7 @@ MWF.xDesktop.WebSocket = new Class({
                         }
                         break;
                     default:
+                        document.getElementById("tip_sound").play();
                         switch (data.type){
                             case "task":
                             case "task_create":
@@ -145,6 +147,8 @@ MWF.xDesktop.WebSocket = new Class({
                             case "custom_create":
                                 this.receiveCustomMessage(data);
                                 break;
+                            case "im_create":
+                                this.receiveChatMessage(data);
                             default:
                         }
                 }
@@ -158,11 +162,11 @@ MWF.xDesktop.WebSocket = new Class({
     retry: function(){
         if (this.webSocket){
             this.close();
-        }else{
-            this.initialize();
         }
+        this.initialize();
     },
     close: function(){
+        this.reConnect = false;
         if (this.webSocket) this.webSocket.close();
         //WebSocket.close();
     },
@@ -199,10 +203,26 @@ MWF.xDesktop.WebSocket = new Class({
             //this.initialize();
         }
     },
-
-    receiveChatMessage: function(data){
-        if (layout.desktop.widgets["IMIMWidget"]) layout.desktop.widgets["IMIMWidget"].receiveChatMessage(data);
+    receiveChatMessage: function (data) {
+        console.log(layout.desktop);
+        //if (layout.desktop.widgets["IMIMWidget"]) layout.desktop.widgets["IMIMWidget"].receiveChatMessage(data);
         //if (layout.desktop.top.userPanel) layout.desktop.top.userPanel.receiveChatMessage(data);
+        var sent = false;
+        if(layout.desktop.apps["IM"]){
+            layout.desktop.apps["IM"].chats.forEach(chat=>{
+                chat.dialogues[data.body.createPerson+data.person] && chat.dialogues[data.body.createPerson+data.person].showMessage({text:data.body.body},data.body.createPerson);
+                sent = true;
+            });
+        }
+        if(!sent){
+            var content = "<font style='color: #333; font-weight: bold'>" + MWF.LP.desktop.messsage.customMessage + "</font>" + data.body.body;
+            var msg = {
+                "subject": '有来自'+data.body.createPerson+'新消息',
+                "content": content
+            };
+            var messageItem = layout.desktop.message.addMessage(msg);
+            var tooltipItem = layout.desktop.message.addTooltip(msg);
+        }
     },
     openWork: function(id, e){
         o2.Actions.get("x_processplatform_assemble_surface").getWorkInfor(id, function(){
@@ -217,6 +237,7 @@ MWF.xDesktop.WebSocket = new Class({
         }.bind(this));
     },
     receiveTaskMessage: function(data){
+        debugger;
         var task = data.body;
         //var content = MWF.LP.desktop.messsage.receiveTask+"《"+task.title+"》, "+MWF.LP.desktop.messsage.activity+": <font style='color: #ea621f'>"+(task.activityName || "")+"</font>";
         var content = data.title;
@@ -261,8 +282,8 @@ MWF.xDesktop.WebSocket = new Class({
             this.openWork(read.work,e);
         }.bind(this));
     },
-    receiveCustomMessage: function(data){
-        var content = "<font style='color: #333; font-weight: bold'>"+MWF.LP.desktop.messsage.customMessage+"</font>"+data.body;
+    receiveCustomMessage: function (data) {
+        var content = "<font style='color: #333; font-weight: bold'>" + MWF.LP.desktop.messsage.customMessage + "</font>" + data.body;
         var msg = {
             "subject": MWF.LP.desktop.messsage.customMessageTitle,
             "content": content
@@ -271,13 +292,10 @@ MWF.xDesktop.WebSocket = new Class({
         var tooltipItem = layout.desktop.message.addTooltip(msg);
     },
 
-
-
-
     receiveReviewMessage: function(data){
         var content = MWF.LP.desktop.messsage.receiveReview+"《"+data.title+"》. ";
         content += "<br/><font style='color: #333; font-weight: bold'>"+MWF.LP.desktop.messsage.appliction+": </font><font style='color: #ea621f'>"+data.applicationName+"</font>;  "+
-        "<font style='color: #333; font-weight: bold'>"+MWF.LP.desktop.messsage.process+": </font><font style='color: #ea621f'>"+data.processName+"</font>";
+            "<font style='color: #333; font-weight: bold'>"+MWF.LP.desktop.messsage.process+": </font><font style='color: #ea621f'>"+data.processName+"</font>";
         var msg = {
             "subject": MWF.LP.desktop.messsage.reviewMessage,
             "content": content

@@ -114,6 +114,12 @@
         "action" : "openScheduleSetting"
       },
       {
+        "id": "40.12",
+        "access": "admin",
+        "title": "轮班设置",
+        "action": "openScheduleSetting"
+      },
+      {
         "id" : "40.20",
         "access" : "admin",
         "title" : "统计周期设置",
